@@ -23,13 +23,20 @@ bool sendCmd = false;
 String slaveCmd = "0";
 String slaveState = "0";
 int medida;
-int porcentaje;
+int medida2;
+int contador = 0;
+int contador2 = 0; 
+float porcentaje;
+int capacidadDelTanque = 350;
 stringstream ss;
 string str;
 bool estado = 0;
 bool estadoAnt = 0;
 
-
+//Variables para el timer
+unsigned long previousMillis = 0;  // Variable para almacenar el tiempo anterior
+const unsigned long interval = 120000;  // Retraso de una hora en milisegundos
+unsigned long currentMillis;
 
 //Objects
 WiFiServer server(80);
@@ -60,32 +67,55 @@ void loop() {
   clientRequest();
 }
 
-void clientRequest( ) { /* function clientRequest */
-  ////Check if client connected
+void clientRequest( ) { /* funcion clientRequest */
+  ////Revisa si el cliente esta conectado
   WiFiClient client = server.available();
   client.setTimeout(50);
   if (client) {
     if (client.connected()) {
-      //Print client IP address
+      //Imprime la direccion ip del cliente
       Serial.print(" ->");Serial.println(client.remoteIP());
-      String request = client.readStringUntil('\r'); //receives the message from the client
+      String request = client.readStringUntil('\r'); //receive el mensaje del cliente
       
       if (request.indexOf("Slave0") == 0) {
-        //Handle slave request
+        //Manejo de la solicitud del esclavo
         Serial.print("From "); Serial.println(request);
         int index = request.indexOf(":");
         String slaveid = request.substring(0, index);
         slaveState = request.substring(request.indexOf("x") + 1, request.length());
         Serial.print("state received: "); Serial.println(slaveState);
+        //Obtencion de la medida del sensor
         medida = slaveState.toInt();
-        porcentaje = 100-(medida-20);
+        //Porcentaje de llenado del tanque
+        porcentaje = ((medida-20)*100)/capacidadDelTanque;
         Serial.print("\nPorcentaje de llenado = ");Serial.print(porcentaje); Serial.print("%");
-        
-        if (porcentaje >= 60) {
-          digitalWrite(BOMBA, HIGH); // Enciende el LED
-        } else if(porcentaje <= 20) {
-          digitalWrite(BOMBA, LOW);  // Apaga el LED
+        //Encendido o apagado de la bomba
+        if (porcentaje >= 80) {
+          digitalWrite(BOMBA, HIGH); // apaga la bomba
+          contador = 0;
+          Serial.println(contador);
+        } else {
+          digitalWrite(BOMBA, LOW);  // enciende la bomba
+          contador++;
+          Serial.println(contador);
         }
+        if (contador >= 60){
+            //delay(120000);
+            medida2 = slaveState.toInt();
+          if((medida2 - medida)<15){
+            //delay(120000);
+            digitalWrite(BOMBA, HIGH);  // Apaga la bomba
+            do{
+              delay(1000);
+              contador2++;
+              Serial.println(contador2);
+            }while (contador2<=60);
+            contador2 = 0;
+          }
+          contador=0;
+        }
+        webpage(client, porcentaje);
+        delay(1000);
 
         client.print(nom);
         if (sendCmd) {
@@ -99,14 +129,16 @@ void clientRequest( ) { /* function clientRequest */
         Serial.print("From Browser : "); Serial.println(request);
         client.flush();
         //handleRequest(request);
-        webpage(client);
+        webpage(client, porcentaje);
       }
     }
   }
 }
 
-void webpage(WiFiClient browser) { /* function webpage */
+void webpage(WiFiClient browser, float porcentaje) { /* function webpage */
   ////Send webpage to browser
+  String porcentajeStr = String(porcentaje, 2);
+
   browser.println("HTTP/1.1 200 OK");
   browser.println("Content-Type: text/html");
   browser.println(""); //  do not forget this one
@@ -122,7 +154,7 @@ void webpage(WiFiClient browser) { /* function webpage */
   browser.println("<body>");
   browser.println("<header><a href=\"https://casinfraestructura.com.mx/\"><img src=\"https://casinfraestructura.com.mx/wp-content/uploads/2021/09/cropped-Diseno-sin-titulo-28-1.png\" alt=\"\"></a></header><div><h2 class=\"border\">TRESAL</h2><h2 class=\"wave\">TRESAL</h2></div>");
   browser.print("<h3>Porcentaje de llenado =");
-  browser.print(porcentaje);
+  browser.print(porcentajeStr);
   browser.print("%");
   browser.println("</h3>");
   int pinState = digitalRead(BOMBA);
@@ -134,3 +166,4 @@ void webpage(WiFiClient browser) { /* function webpage */
   browser.println("</body></html>");
   delay(1);
 }
+
