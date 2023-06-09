@@ -3,6 +3,7 @@
 //Libraries
 #include <ESP8266WiFi.h> //https://github.com/esp8266/Arduino/blob/master/libraries/ESP8266WiFi/src/ESP8266WiFi.h
 #include <iostream>
+#include <cmath>
 #include <string>
 #include <sstream>
 using namespace std;
@@ -15,34 +16,38 @@ using std::stoi;
 
 //Parameters
 String nom = "Master";
-const char* ssid = "NethomeWifi2.4";
-const char* password = "C4552553b4ny$33";
+const char* ssid = "Skynets";
+const char* password = "SkyPw0l1";
 
 //Variables
 bool sendCmd = false;
 String slaveCmd = "0";
 String slaveState = "0";
 int medida;
+int medida1;
 int medida2;
+int diferencia;
 int contador = 0;
 int contador2 = 0; 
 float porcentaje;
-int capacidadDelTanque = 350;
+int capacidadDelTanque = 400;
 stringstream ss;
 string str;
+string respuesta;
 bool estado = 0;
 bool estadoAnt = 0;
 
 //Variables para el timer
 unsigned long previousMillis = 0;  // Variable para almacenar el tiempo anterior
-const unsigned long interval = 120000;  // Retraso de una hora en milisegundos
+const unsigned long interval = 20000;  // Limite de tiempo de solicitud del Slave0
 unsigned long currentMillis;
+unsigned long lastSlaveCommunicationTime = 0;  // Tiempo en milisegundos de la última comunicación con el Slave
 
 //Objects
 WiFiServer server(80);
 WiFiClient browser;
-IPAddress ip(192, 168, 100, 90);
-IPAddress gateway(192, 168, 100, 1);
+IPAddress ip(192, 168, 1, 177);
+IPAddress gateway(192, 168, 1, 1);
 IPAddress subnet(255, 255, 255, 0);
 
 void setup() {
@@ -70,7 +75,7 @@ void loop() {
 void clientRequest( ) { /* funcion clientRequest */
   ////Revisa si el cliente esta conectado
   WiFiClient client = server.available();
-  client.setTimeout(50);
+  client.setTimeout(500);
   if (client) {
     if (client.connected()) {
       //Imprime la direccion ip del cliente
@@ -78,6 +83,8 @@ void clientRequest( ) { /* funcion clientRequest */
       String request = client.readStringUntil('\r'); //receive el mensaje del cliente
       
       if (request.indexOf("Slave0") == 0) {
+        // Actualizar el tiempo de la última comunicación con el Slave
+        lastSlaveCommunicationTime = millis();
         //Manejo de la solicitud del esclavo
         Serial.print("From "); Serial.println(request);
         int index = request.indexOf(":");
@@ -87,26 +94,9 @@ void clientRequest( ) { /* funcion clientRequest */
         //Obtencion de la medida del sensor
         medida = slaveState.toInt();
         //Porcentaje de llenado del tanque
-        porcentaje = (((medida)*100)/capacidadDelTanque);
+        porcentaje = 100 - (((medida)*100)/capacidadDelTanque);
         Serial.print("\nPorcentaje de llenado = ");Serial.print(porcentaje); Serial.print("%");
-        client.print(nom);
-        if (sendCmd) {
-          sendCmd = false;
-          client.println(": Ok " + slaveid + "! Set state to x" + String(slaveCmd) + "\r");
-        } else {
-          client.println(": Hi " + slaveid + "!\r"); // sends the answer to the client
-        }
-        client.stop();                // terminates the connection with the client
-      } else {
-        Serial.print("From Browser : "); Serial.println(request);
-        client.flush();
-        //handleRequest(request);
-        webpage(client, porcentaje);
-      }
-    }
-  }
-  
-            //Encendido o apagado de la bomba
+        //Encendido o apagado de la bomba
         if (porcentaje >= 90) {
           digitalWrite(BOMBA, HIGH); // apaga la bomba
           contador = 0;
@@ -116,25 +106,28 @@ void clientRequest( ) { /* funcion clientRequest */
           contador++;
           Serial.println(contador);
         }
-    if (contador >= 60){
+        if(contador==1){
+          medida1 = slaveState.toInt();
+        }
+        if (contador >= 120){
             //delay(120000);
             medida2 = slaveState.toInt();
-          if((medida2 - medida)<15){
+            diferencia = abs(medida1 - medida2);
+          if(diferencia<15){
             //delay(120000);
             digitalWrite(BOMBA, HIGH);  // Apaga la bomba
             do{
-              delay(1000);
               contador2++;
               Serial.println(contador2);
-              ////Revisa si el cliente esta conectado
               WiFiClient client = server.available();
-              client.setTimeout(50);
+              client.setTimeout(500);
               if (client) {
+                ////Revisa si el cliente esta conectado
                 if (client.connected()) {
                   //Imprime la direccion ip del cliente
                   Serial.print(" ->");Serial.println(client.remoteIP());
                   String request = client.readStringUntil('\r'); //receive el mensaje del cliente
-                  
+                    
                   if (request.indexOf("Slave0") == 0) {
                     //Manejo de la solicitud del esclavo
                     Serial.print("From "); Serial.println(request);
@@ -145,7 +138,7 @@ void clientRequest( ) { /* funcion clientRequest */
                     //Obtencion de la medida del sensor
                     medida = slaveState.toInt();
                     //Porcentaje de llenado del tanque
-                    porcentaje = (((medida)*100)/capacidadDelTanque);
+                    porcentaje = 100 - (((medida)*100)/capacidadDelTanque);
                     Serial.print("\nPorcentaje de llenado = ");Serial.print(porcentaje); Serial.print("%");
                     client.print(nom);
                     if (sendCmd) {
@@ -154,22 +147,51 @@ void clientRequest( ) { /* funcion clientRequest */
                     } else {
                       client.println(": Hi " + slaveid + "!\r"); // sends the answer to the client
                     }
-                    client.stop();                // terminates the connection with the client
                   } else {
+                    //Obtencion de la medida del sensor
+                    medida = slaveState.toInt();
+                    //Porcentaje de llenado del tanque
+                    porcentaje = 100 - (((medida)*100)/capacidadDelTanque);
+                    Serial.print("\nPorcentaje de llenado = ");Serial.print(porcentaje); Serial.print("%");
                     Serial.print("From Browser : "); Serial.println(request);
                     client.flush();
                     //handleRequest(request);
                     webpage(client, porcentaje);
                   }
-                }
+                }  
               }
+              delay(1000);   //client.stop();  // Terminates the connection with the client
             }while (contador2<=60);
             contador2 = 0;
           }
           contador=0;
+          medida1=0;
+          medida2=0;
         }
-        delay(1000);
-
+        client.print(nom);
+        if (sendCmd) {
+          sendCmd = false;
+          client.println(": Ok " + slaveid + "! Set state to x" + String(slaveCmd) + "\r");
+        } else {
+          client.println(": Hi " + slaveid + "!\r"); // sends the answer to the client
+        }
+      } else {
+        Serial.print("From Browser : "); Serial.println(request);
+        client.flush();
+        //handleRequest(request);
+        webpage(client, porcentaje);
+      }
+    }
+    //client.stop();  // Terminates the connection with the client
+  }
+  // Verificar si ha pasado mucho tiempo desde la última comunicación con el Slave
+  currentMillis = millis();
+  if (currentMillis - lastSlaveCommunicationTime > interval) {
+    // No se ha recibido información del Slave, apagar la bomba
+    digitalWrite(BOMBA, HIGH);
+    Serial.println("No se recibió información del Slave. Bomba apagada.");
+  }
+  delay(1000);
 }
 
 void webpage(WiFiClient browser, float porcentaje) { /* function webpage */
