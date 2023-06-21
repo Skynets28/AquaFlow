@@ -29,7 +29,10 @@ int medida2;
 int diferencia;
 int contador = 0;
 int contador2 = 0; 
+int numeroMuestra = 0;
 float porcentaje;
+float muestraPorcentaje=0;
+float muestraPromedio=0;
 int capacidadDelTanque = 400;
 stringstream ss;
 string str;
@@ -46,7 +49,7 @@ unsigned long lastSlaveCommunicationTime = 0;  // Tiempo en milisegundos de la �
 //Objects
 WiFiServer server(80);
 WiFiClient browser;
-IPAddress ip(192, 168, 1, 177);
+IPAddress ip(192, 168, 1, 178);
 IPAddress gateway(192, 168, 1, 1);
 IPAddress subnet(255, 255, 255, 0);
 
@@ -95,9 +98,13 @@ void clientRequest( ) { /* funcion clientRequest */
         medida = slaveState.toInt();
         //Porcentaje de llenado del tanque
         porcentaje = 100 - (((medida)*100)/capacidadDelTanque);
+        muestraPorcentaje = muestraPorcentaje + porcentaje;
+        numeroMuestra++;
         Serial.print("\nPorcentaje de llenado = ");Serial.print(porcentaje); Serial.print("%");
         //Encendido o apagado de la bomba
-        if (porcentaje >= 90) {
+        if(numeroMuestra == 40){
+          muestraPromedio = (muestraPorcentaje/40);
+          if (muestraPromedio >= 90) {
           digitalWrite(BOMBA, HIGH); // apaga la bomba
           contador = 0;
           Serial.println(contador);
@@ -107,13 +114,13 @@ void clientRequest( ) { /* funcion clientRequest */
           Serial.println(contador);
         }
         if(contador==1){
-          medida1 = slaveState.toInt();
+          medida1 = muestraPromedio;
         }
-        if (contador >= 120){
+        if (contador >= 6){
             //delay(120000);
-            medida2 = slaveState.toInt();
+            medida2 = muestraPromedio;
             diferencia = abs(medida1 - medida2);
-          if(diferencia<15){
+          if(diferencia<20){
             //delay(120000);
             digitalWrite(BOMBA, HIGH);  // Apaga la bomba
             do{
@@ -161,12 +168,15 @@ void clientRequest( ) { /* funcion clientRequest */
                 }  
               }
               delay(1000);   //client.stop();  // Terminates the connection with the client
-            }while (contador2<=60);
+            }while (contador2<=7200);
             contador2 = 0;
           }
           contador=0;
           medida1=0;
           medida2=0;
+        }
+        muestraPorcentaje = 0;
+        numeroMuestra = 0;
         }
         client.print(nom);
         if (sendCmd) {
@@ -191,7 +201,7 @@ void clientRequest( ) { /* funcion clientRequest */
     digitalWrite(BOMBA, HIGH);
     Serial.println("No se recibió información del Slave. Bomba apagada.");
   }
-  delay(1000);
+  delay(500);
 }
 
 void webpage(WiFiClient browser, float porcentaje) { /* function webpage */
