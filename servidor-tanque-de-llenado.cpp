@@ -30,6 +30,7 @@ int diferencia;
 int contador = 0;
 int contador2 = 0; 
 int numeroMuestra = 0;
+int status;
 float porcentaje;
 float muestraPorcentaje=0;
 float muestraPromedio=0;
@@ -49,7 +50,7 @@ unsigned long lastSlaveCommunicationTime = 0;  // Tiempo en milisegundos de la �
 //Objects
 WiFiServer server(80);
 WiFiClient browser;
-IPAddress ip(192, 168, 1, 178);
+IPAddress ip(192, 168, 1, 177);
 IPAddress gateway(192, 168, 1, 1);
 IPAddress subnet(255, 255, 255, 0);
 
@@ -101,6 +102,7 @@ void clientRequest( ) { /* funcion clientRequest */
         muestraPorcentaje = muestraPorcentaje + porcentaje;
         numeroMuestra++;
         Serial.print("\nPorcentaje de llenado = ");Serial.print(porcentaje); Serial.print("%");
+        status = 1;
         //Encendido o apagado de la bomba
         if(numeroMuestra == 40){
           muestraPromedio = (muestraPorcentaje/40);
@@ -162,8 +164,9 @@ void clientRequest( ) { /* funcion clientRequest */
                     Serial.print("\nPorcentaje de llenado = ");Serial.print(porcentaje); Serial.print("%");
                     Serial.print("From Browser : "); Serial.println(request);
                     client.flush();
+                    status = 2;
                     //handleRequest(request);
-                    webpage(client, porcentaje);
+                    webpage(client, porcentaje, status);
                   }
                 }  
               }
@@ -189,7 +192,7 @@ void clientRequest( ) { /* funcion clientRequest */
         Serial.print("From Browser : "); Serial.println(request);
         client.flush();
         //handleRequest(request);
-        webpage(client, porcentaje);
+        webpage(client, porcentaje, status);
       }
     }
     //client.stop();  // Terminates the connection with the client
@@ -200,11 +203,12 @@ void clientRequest( ) { /* funcion clientRequest */
     // No se ha recibido información del Slave, apagar la bomba
     digitalWrite(BOMBA, HIGH);
     Serial.println("No se recibió información del Slave. Bomba apagada.");
+    status = 3;
   }
   delay(500);
 }
 
-void webpage(WiFiClient browser, float porcentaje) { /* function webpage */
+void webpage(WiFiClient browser, float porcentaje, int status) { /* function webpage */
   ////Send webpage to browser
   String porcentajeStr = String(porcentaje, 2);
 
@@ -231,6 +235,13 @@ void webpage(WiFiClient browser, float porcentaje) { /* function webpage */
     browser.print("<h3>ESTATUS DE LA BOMBA: APAGADA</h3>");
   } else {
     browser.print("<h3>ESTATUS DE LA BOMBA: ENCENDIDA</h3>");
+  }
+  if(status == 1){
+    browser.print("<h3>(Funcionando correctamente)</h3>");
+  }else if (status == 2){
+    browser.print("<h3>(No hubo flujo de agua, en espera para volver a intentar)</h3>");
+  } else if(status == 3){
+    browser.print("<h3>(No se reciben datos del sensor de nivel)</h3>");
   }
   browser.println("</body></html>");
   delay(1);
