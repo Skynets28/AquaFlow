@@ -10,7 +10,7 @@ using namespace std;
 using std::stoi;
 
 //Constants
-#define NUM_SLAVES 1
+#define NUM_SLAVES 2
 #define LED 2
 #define BOMBA 13
 
@@ -29,26 +29,37 @@ int medida2;
 int diferencia;
 int contador = 0;
 int contador2 = 0; 
-int numeroMuestra = 0;
+int numeroMuestra1 = 0;
+int numeroMuestra2 = 0;
 int status;
-float porcentaje;
-float muestraPorcentaje=0;
-float muestraPromedio=0;
-int capacidadDelTanque = 400;
+float porcentaje1;
+float porcentaje2;
+float muestraPorcentaje1=0;
+float muestraPromedio1=0;
+float muestraPorcentaje2=0;
+float muestraPromedio2=0;
+int capacidadDelTanque1 = 300;
+int capacidadDelTanque2 = 300;
 stringstream ss;
 string str;
 string respuesta;
 bool estado = 0;
 bool estadoAnt = 0;
+bool responseSlave0 = true;
+bool responseSlave1 = false;
+bool estatusCisterna = false;
 
 //Variables para el timer
 unsigned long previousMillis = 0;  // Variable para almacenar el tiempo anterior
-const unsigned long interval = 20000;  // Limite de tiempo de solicitud del Slave0
+const unsigned long interval = 120000;  // Limite de tiempo de solicitud del Slave0
 unsigned long currentMillis;
-unsigned long lastSlaveCommunicationTime = 0;  // Tiempo en milisegundos de la última comunicación con el Slave
+unsigned long lastSlaveCommunicationTime1 = 0;  // Tiempo en milisegundos de la última comunicación con el Slave
+unsigned long lastSlaveCommunicationTime2 = 0;  // Tiempo en milisegundos de la última comunicación con el Slave
 
 //Objects
-WiFiServer server(80);
+WiFiServer serverP(80); //Puerto Servidor primario
+WiFiServer serverS(8080); //Puerto Servidor Secundario
+WiFiServer serverW(443);
 WiFiClient browser;
 IPAddress ip(192, 168, 1, 177);
 IPAddress gateway(192, 168, 1, 1);
@@ -65,152 +76,176 @@ void setup() {
     delay(500);
     Serial.print(F("."));
   }
-  server.begin();
+  serverP.begin();
+  serverS.begin();
+  serverW.begin();
   Serial.print(nom);
   Serial.print(F(" connected to Wifi! IP address : http://")); Serial.println(WiFi.localIP()); // Print the IP address
   pinMode(LED, OUTPUT);
   pinMode(BOMBA, OUTPUT);
+  digitalWrite(BOMBA, HIGH);//Apaga la bomba
 }
 
 void loop() {
-  clientRequest();
-}
-
-void clientRequest( ) { /* funcion clientRequest */
-  ////Revisa si el cliente esta conectado
-  WiFiClient client = server.available();
-  client.setTimeout(500);
-  if (client) {
-    if (client.connected()) {
-      //Imprime la direccion ip del cliente
-      Serial.print(" ->");Serial.println(client.remoteIP());
-      String request = client.readStringUntil('\r'); //receive el mensaje del cliente
-      
-      if (request.indexOf("Slave0") == 0) {
-        // Actualizar el tiempo de la última comunicación con el Slave
-        lastSlaveCommunicationTime = millis();
-        //Manejo de la solicitud del esclavo
-        Serial.print("From "); Serial.println(request);
-        int index = request.indexOf(":");
-        String slaveid = request.substring(0, index);
-        slaveState = request.substring(request.indexOf("x") + 1, request.length());
-        Serial.print("state received: "); Serial.println(slaveState);
-        //Obtencion de la medida del sensor
-        medida = slaveState.toInt();
-        //Porcentaje de llenado del tanque
-        porcentaje = 100 - (((medida)*100)/capacidadDelTanque);
-        muestraPorcentaje = muestraPorcentaje + porcentaje;
-        numeroMuestra++;
-        Serial.print("\nPorcentaje de llenado = ");Serial.print(porcentaje); Serial.print("%");
-        status = 1;
-        //Encendido o apagado de la bomba
-        if(numeroMuestra == 40){
-          muestraPromedio = (muestraPorcentaje/40);
-          if (muestraPromedio >= 90) {
-          digitalWrite(BOMBA, HIGH); // apaga la bomba
-          contador = 0;
-          Serial.println(contador);
-        } else {
-          digitalWrite(BOMBA, LOW);  // enciende la bomba
-          contador++;
-          Serial.println(contador);
-        }
-        if(contador==1){
-          medida1 = muestraPromedio;
-        }
-        if (contador >= 6){
-            //delay(120000);
-            medida2 = muestraPromedio;
-            diferencia = abs(medida1 - medida2);
-          if(diferencia<20){
-            //delay(120000);
-            digitalWrite(BOMBA, HIGH);  // Apaga la bomba
-            do{
-              contador2++;
-              Serial.println(contador2);
-              WiFiClient client = server.available();
-              client.setTimeout(500);
-              if (client) {
-                ////Revisa si el cliente esta conectado
-                if (client.connected()) {
-                  //Imprime la direccion ip del cliente
-                  Serial.print(" ->");Serial.println(client.remoteIP());
-                  String request = client.readStringUntil('\r'); //receive el mensaje del cliente
-                    
-                  if (request.indexOf("Slave0") == 0) {
-                    //Manejo de la solicitud del esclavo
-                    Serial.print("From "); Serial.println(request);
-                    int index = request.indexOf(":");
-                    String slaveid = request.substring(0, index);
-                    slaveState = request.substring(request.indexOf("x") + 1, request.length());
-                    Serial.print("state received: "); Serial.println(slaveState);
-                    //Obtencion de la medida del sensor
-                    medida = slaveState.toInt();
-                    //Porcentaje de llenado del tanque
-                    porcentaje = 100 - (((medida)*100)/capacidadDelTanque);
-                    Serial.print("\nPorcentaje de llenado = ");Serial.print(porcentaje); Serial.print("%");
-                    client.print(nom);
-                    if (sendCmd) {
-                      sendCmd = false;
-                      client.println(": Ok " + slaveid + "! Set state to x" + String(slaveCmd) + "\r");
-                    } else {
-                      client.println(": Hi " + slaveid + "!\r"); // sends the answer to the client
-                    }
-                  } else {
-                    //Obtencion de la medida del sensor
-                    medida = slaveState.toInt();
-                    //Porcentaje de llenado del tanque
-                    porcentaje = 100 - (((medida)*100)/capacidadDelTanque);
-                    Serial.print("\nPorcentaje de llenado = ");Serial.print(porcentaje); Serial.print("%");
-                    Serial.print("From Browser : "); Serial.println(request);
-                    client.flush();
-                    status = 2;
-                    //handleRequest(request);
-                    webpage(client, porcentaje, status);
-                  }
-                }  
-              }
-              delay(1000);   //client.stop();  // Terminates the connection with the client
-            }while (contador2<=7200);
-            contador2 = 0;
-          }
-          contador=0;
-          medida1=0;
-          medida2=0;
-        }
-        muestraPorcentaje = 0;
-        numeroMuestra = 0;
-        }
-        client.print(nom);
-        if (sendCmd) {
-          sendCmd = false;
-          client.println(": Ok " + slaveid + "! Set state to x" + String(slaveCmd) + "\r");
-        } else {
-          client.println(": Hi " + slaveid + "!\r"); // sends the answer to the client
-        }
-      } else {
-        Serial.print("From Browser : "); Serial.println(request);
-        client.flush();
-        //handleRequest(request);
-        webpage(client, porcentaje, status);
-      }
-    }
-    //client.stop();  // Terminates the connection with the client
+  clientRequest8080();
+  clientRequest80();
+  if(!estatusCisterna){
+    status = 1;
+  }else{
+    status = 2;
   }
-  // Verificar si ha pasado mucho tiempo desde la última comunicación con el Slave
   currentMillis = millis();
-  if (currentMillis - lastSlaveCommunicationTime > interval) {
-    // No se ha recibido información del Slave, apagar la bomba
+  if ((currentMillis - lastSlaveCommunicationTime1) > interval && (currentMillis - lastSlaveCommunicationTime2) > interval) {
+    // No se ha recibido información del Slave1, apagar la bomba
     digitalWrite(BOMBA, HIGH);
-    Serial.println("No se recibió información del Slave. Bomba apagada.");
+    Serial.println("No se recibió información del Slave 0 y del slave 1. Bomba apagada.");
     status = 3;
+  }else if ((currentMillis - lastSlaveCommunicationTime1) > interval && (currentMillis - lastSlaveCommunicationTime2) < interval){
+    // No se ha recibido información del Slave1, apagar la bomba
+    digitalWrite(BOMBA, HIGH);
+    Serial.println("No se recibió información del Slave 1. Bomba apagada.");
+    status = 4;
+  }else if ((currentMillis - lastSlaveCommunicationTime1) < interval && (currentMillis - lastSlaveCommunicationTime2) > interval){
+    // No se ha recibido información del Slave0, apagar la bomba
+    digitalWrite(BOMBA, HIGH);
+    Serial.println("No se recibió información del Slave 0. Bomba apagada.");
+    status = 5;
   }
+  clientRequest465(muestraPromedio1, muestraPromedio2, status);
   delay(500);
 }
 
-void webpage(WiFiClient browser, float porcentaje, int status) { /* function webpage */
+//Funcion de solicitud del cliente puerto 8080
+void clientRequest8080(){
+  WiFiClient clientS = serverS.available();
+  clientS.setTimeout(50);
+  if(clientS){
+    if(clientS.connected()){
+      //Imprimir IP del cliente
+      Serial.print("\nIP del cliente --> "); Serial.print(clientS.remoteIP());
+      //Recepcion del mesaje del cliente
+      String solicitud = clientS.readStringUntil('\r');
+      if(solicitud.indexOf("Slave1") == 0){
+        //Manejo de la solicitud del Slave0
+        //Actualizar el tiempo de la última comunicación con el Slave
+        lastSlaveCommunicationTime2 = millis();
+        //Imprimir datos de la solicitud
+        Serial.print("From "); Serial.print(solicitud);
+        int index = solicitud.indexOf(":");
+        String slaveId = solicitud.substring(0 , index);
+        slaveState = solicitud.substring(solicitud.indexOf("x") + 1, solicitud.length());
+        Serial.print("Estado recibido: "); Serial.print(slaveState);
+        //Obtencion de la medida del sensor
+        medida1 = slaveState.toInt();
+        //Porcentaje de llenado del tanque
+        porcentaje1 = 100 - (((medida1)*100)/capacidadDelTanque1);
+        muestraPorcentaje1 = muestraPorcentaje1 + porcentaje1;
+        numeroMuestra1++;
+        Serial.print("\nPorcentaje de llenado = ");Serial.print(porcentaje1); Serial.print("%"); Serial.print(" Numero de Muestra = ");Serial.print(numeroMuestra1);
+        //Evaluacion del nevel de agua de la 
+        if(numeroMuestra1 == 40){
+          muestraPromedio1 = (muestraPorcentaje1/40);
+          if (muestraPromedio1 >= 50) {
+            estatusCisterna = true; // apaga la bomba
+            Serial.println("Hay agua en la cisterna");
+          } else {
+            estatusCisterna = false;  // enciende la bomba
+            Serial.println("No hay agua en la cisterna");
+          }
+          numeroMuestra1 = 0;
+          muestraPorcentaje1 = 0;
+        }
+        clientS.print(nom);
+        if (sendCmd) {
+          sendCmd = false;
+          clientS.println(": Ok " + slaveId + "! Set state to x" + String(slaveCmd) + "\r");
+        } else {
+          clientS.println(": Hi " + slaveId + "!\r"); // sends the answer to the client
+        }
+      }
+    } 
+  }
+}
+//Funcion de solicitud del cliente puerto 80
+void clientRequest80(){
+  //Revisar si el cliente esta conectado
+  WiFiClient clientP = serverP.available();
+  clientP.setTimeout(50);
+  if(clientP){
+    if(clientP.connected()){
+      //Imprimir IP del cliente
+      Serial.print("\nIP del cliente --> "); Serial.print(clientP.remoteIP());
+      //Recepcion del mesaje del cliente
+      String solicitud = clientP.readStringUntil('\r');
+      if(solicitud.indexOf("Slave0") == 0){
+        //Manejo de la solicitud del Slave0
+        //Actualizar el tiempo de la última comunicación con el Slave
+        lastSlaveCommunicationTime1 = millis();
+        //Imprimir datos de la solicitud
+        Serial.print("From "); Serial.print(solicitud);
+        int index = solicitud.indexOf(":");
+        String slaveId = solicitud.substring(0 , index);
+        slaveState = solicitud.substring(solicitud.indexOf("x") + 1, solicitud.length());
+        Serial.print("Estado recibido: "); Serial.print(slaveState);
+        //Obtencion de la medida del sensor
+        medida2 = slaveState.toInt();
+        //Porcentaje de llenado del tanque
+        porcentaje2 = 100 - (((medida2)*100)/capacidadDelTanque2);
+        muestraPorcentaje2 = muestraPorcentaje2 + porcentaje2;
+        numeroMuestra2++;
+        Serial.print("\nPorcentaje de llenado = ");Serial.print(porcentaje2); Serial.print("%"); Serial.print(" Numero de Muestra = ");Serial.print(numeroMuestra2);
+        //Encendido y apagado de la bomba
+        if(numeroMuestra2 == 40){
+          muestraPromedio2 = (muestraPorcentaje2/40);
+          if (muestraPromedio2 >= 90) {
+              digitalWrite(BOMBA, HIGH); // apaga la bomba
+              Serial.println("Bomba apagada");
+          }else if (muestraPromedio2 < 50){
+              if(estatusCisterna){
+                digitalWrite(BOMBA, LOW);  // enciende la bomba
+                Serial.println("Bomba encendida");
+              }else{
+                Serial.println("No hay agua en la cisterna, no se encendera la bomba");
+                digitalWrite(BOMBA, HIGH); // apaga la bomba
+              }
+          }
+          numeroMuestra2 = 0;
+          muestraPorcentaje2 = 0;   
+        }
+        clientP.print(nom);
+        if (sendCmd) {
+          sendCmd = false;
+          clientP.println(": Ok " + slaveId + "! Set state to x" + String(slaveCmd) + "\r");
+        } else {
+          clientP.println(": Hi " + slaveId + "!\r"); // sends the answer to the client
+        }
+      }
+    }
+  }
+}
+
+void clientRequest465(float muestraPromedio1, float muestraPromedio2, int status){
+  WiFiClient clientW = serverW.available();
+  clientW.setTimeout(50);
+  if(clientW){
+    if(clientW.connected()){
+      //Imprimir IP del cliente
+      Serial.print("IP del cliente --> "); Serial.print(clientW.remoteIP());
+      //Recepcion del mesaje del cliente
+      String solicitud = clientW.readStringUntil('\r');
+      Serial.print("From Browser : "); Serial.println(solicitud);
+      clientW.flush();
+      //handleRequest(solicitud);
+      webpage(clientW, muestraPromedio1, muestraPromedio2, status);
+    }
+  }
+}
+
+//Funcion de la pagina web
+void webpage(WiFiClient browser, float muestraPromedio1, float muestraPromedio2, int status) { /* function webpage */
   ////Send webpage to browser
-  String porcentajeStr = String(porcentaje, 2);
+  String porcentajeStr1 = String(muestraPromedio1, 2);
+  String porcentajeStr2 = String(muestraPromedio2, 2);
 
   browser.println("HTTP/1.1 200 OK");
   browser.println("Content-Type: text/html");
@@ -226,8 +261,12 @@ void webpage(WiFiClient browser, float porcentaje, int status) { /* function web
   browser.println("</head>");
   browser.println("<body>");
   browser.println("<header><a href=\"https://casinfraestructura.com.mx/\"><img src=\"https://casinfraestructura.com.mx/wp-content/uploads/2021/09/cropped-Diseno-sin-titulo-28-1.png\" alt=\"\"></a></header><div><h2 class=\"border\">TRESAL</h2><h2 class=\"wave\">TRESAL</h2></div>");
-  browser.print("<h3>Porcentaje de llenado =");
-  browser.print(porcentajeStr);
+  browser.print("<h3>Porcentaje de llenado del tanque =");
+  browser.print(porcentajeStr2);
+  browser.print("%");
+  browser.println("</h3>");
+  browser.print("<h3>Porcentaje de llenado de la cisterna =");
+  browser.print(porcentajeStr1);
   browser.print("%");
   browser.println("</h3>");
   int pinState = digitalRead(BOMBA);
@@ -237,13 +276,16 @@ void webpage(WiFiClient browser, float porcentaje, int status) { /* function web
     browser.print("<h3>ESTATUS DE LA BOMBA: ENCENDIDA</h3>");
   }
   if(status == 1){
+    browser.print("<h3>(Funcionando correctamente, No hay agua en la cisterna)</h3>");
+  }else if(status == 2){
     browser.print("<h3>(Funcionando correctamente)</h3>");
-  }else if (status == 2){
-    browser.print("<h3>(No hubo flujo de agua, en espera para volver a intentar)</h3>");
-  } else if(status == 3){
-    browser.print("<h3>(No se reciben datos del sensor de nivel)</h3>");
+  }else if(status == 3){
+    browser.print("<h3>(No se reciben datos del sensor de nivel del cisterna y del tanque)</h3>");
+  }else if(status == 4){
+    browser.print("<h3>(No se reciben datos del sensor de nivel de la cisterna)</h3>");
+  }else if(status == 5){
+    browser.print("<h3>(No se reciben datos del sensor de nivel de la tanque)</h3>");
   }
   browser.println("</body></html>");
   delay(1);
 }
-
