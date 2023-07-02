@@ -1,0 +1,96 @@
+//CLIENTE
+
+//Libraries
+#include <ESP8266WiFi.h>
+
+//Constants
+#define LED 2
+#define UPDATE_TIME 500
+// Define Trig and Echo pin:
+#define TRIGGER_PIN 5
+#define ECHO_PIN 4
+
+//Parameters
+String nom = "Slave1";
+const char* ssid = "Skynets";
+const char* password = "SkyPw0l1";
+
+//Variables
+String command;
+unsigned long previousRequest = 0;
+
+// Declaramos las variables que vamos a utilizar
+float duration;
+int distance;
+int distance1=200;
+// Definimos la velocidad del sonido en centímetros por segundo
+const float SPEED_OF_SOUND_CM_PER_SEC = 34300.0;
+
+// Definimos la distancia máxima a medir en centímetros
+const int MAX_DISTANCE_CM = 400;
+
+//Objects
+WiFiClient master;
+IPAddress server(192, 168, 1, 177);
+
+void setup() {
+  //Init Serial USB
+  Serial.begin(115200);
+  Serial.println(F("Initialize System"));
+  
+  // Configure IP, Gateway, and Subnet
+  IPAddress ip(192, 168, 1, 129);
+  IPAddress gateway(192, 168, 1, 1);
+  IPAddress subnet(255, 255, 255, 0);
+  WiFi.config(ip, gateway, subnet);
+  
+  //Init ESP8266 Wifi
+  WiFi.begin(ssid, password);
+  
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(F("."));
+  }
+  
+  Serial.print(nom);
+  Serial.print(F(" connected to Wifi! IP address: "));
+  Serial.println(WiFi.localIP());
+  
+  // Inicializamos los pines como entradas y salidas
+  pinMode(TRIGGER_PIN, OUTPUT);
+  pinMode(ECHO_PIN, INPUT_PULLUP);
+  pinMode(LED, OUTPUT);
+}
+
+void loop() {
+  requestMaster();
+  delay(500);
+}
+
+void requestMaster() {
+  // Enviamos un pulso de 10 microsegundos al pin del trigger
+  digitalWrite(TRIGGER_PIN, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIGGER_PIN, HIGH);
+  delayMicroseconds(15);
+  digitalWrite(TRIGGER_PIN, LOW);
+
+  // Medimos la duración del pulso en el pin del echo
+  duration = pulseIn(ECHO_PIN, HIGH, 26000);
+
+  // Calculamos la distancia en centímetros
+  distance = int(round((duration/58.3)));
+
+  // Verificamos que la distancia esté dentro de los límites establecidos
+  Serial.print("Distancia: ");
+  Serial.print(distance);
+  Serial.println(" cm");
+  
+  // Request to master
+  if ((millis() - previousRequest) > UPDATE_TIME) {
+    previousRequest = millis();
+    if (master.connect(server, 8080)) {
+      master.println(nom + ": Hello! my current state is x" + String(distance) + "\r");
+    }
+  }
+}
