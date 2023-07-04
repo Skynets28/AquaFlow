@@ -16,8 +16,8 @@ using std::stoi;
 
 //Parameters
 String nom = "Master";
-const char* ssid = "Skynets";
-const char* password = "SkyPw0l1";
+const char* ssid = "TRESALNet_wifi";
+const char* password = "TRESALB2023#";
 
 //Variables
 bool sendCmd = false;
@@ -38,8 +38,8 @@ float muestraPorcentaje1=0;
 float muestraPromedio1=0;
 float muestraPorcentaje2=0;
 float muestraPromedio2=0;
-int capacidadDelTanque1 = 300;
-int capacidadDelTanque2 = 300;
+int capacidadDelTanque1 = 280;
+int capacidadDelTanque2 = 400;
 stringstream ss;
 string str;
 string respuesta;
@@ -61,8 +61,8 @@ WiFiServer serverP(80); //Puerto Servidor primario
 WiFiServer serverS(8080); //Puerto Servidor Secundario
 WiFiServer serverW(443);
 WiFiClient browser;
-IPAddress ip(192, 168, 1, 177);
-IPAddress gateway(192, 168, 1, 1);
+IPAddress ip(192, 168, 0, 177);
+IPAddress gateway(192, 168, 0, 70);
 IPAddress subnet(255, 255, 255, 0);
 
 void setup() {
@@ -103,12 +103,12 @@ void loop() {
   }else if ((currentMillis - lastSlaveCommunicationTime1) > interval && (currentMillis - lastSlaveCommunicationTime2) < interval){
     // No se ha recibido información del Slave1, apagar la bomba
     digitalWrite(BOMBA, HIGH);
-    Serial.println("No se recibió información del Slave 1. Bomba apagada.");
+    Serial.println("No se recibió información del Slave 0. Bomba apagada.");
     status = 4;
   }else if ((currentMillis - lastSlaveCommunicationTime1) < interval && (currentMillis - lastSlaveCommunicationTime2) > interval){
     // No se ha recibido información del Slave0, apagar la bomba
     digitalWrite(BOMBA, HIGH);
-    Serial.println("No se recibió información del Slave 0. Bomba apagada.");
+    Serial.println("No se recibió información del Slave 1. Bomba apagada.");
     status = 5;
   }
   clientRequest465(muestraPromedio1, muestraPromedio2, status);
@@ -145,11 +145,11 @@ void clientRequest8080(){
         //Evaluacion del nevel de agua de la 
         if(numeroMuestra1 == 40){
           muestraPromedio1 = (muestraPorcentaje1/40);
-          if (muestraPromedio1 >= 50) {
-            estatusCisterna = true; // apaga la bomba
+          if (muestraPromedio1 >= 20) {
+            estatusCisterna = true; // enciende la bomba
             Serial.println("Hay agua en la cisterna");
           } else {
-            estatusCisterna = false;  // enciende la bomba
+            estatusCisterna = false;  // apaga la bomba
             Serial.println("No hay agua en la cisterna");
           }
           numeroMuestra1 = 0;
@@ -271,9 +271,9 @@ void webpage(WiFiClient browser, float muestraPromedio1, float muestraPromedio2,
   browser.println("</h3>");
   int pinState = digitalRead(BOMBA);
   if (pinState == HIGH) {
-    browser.print("<h3>ESTATUS DE LA BOMBA: APAGADA</h3>");
+    browser.print("<h3>ESTATUS DEL SISTEMA: APAGADO</h3>");
   } else {
-    browser.print("<h3>ESTATUS DE LA BOMBA: ENCENDIDA</h3>");
+    browser.print("<h3>ESTATUS DEL SISTEMA: ENCENDIDO</h3>");
   }
   if(status == 1){
     browser.print("<h3>(Funcionando correctamente, No hay agua en la cisterna)</h3>");
@@ -282,9 +282,9 @@ void webpage(WiFiClient browser, float muestraPromedio1, float muestraPromedio2,
   }else if(status == 3){
     browser.print("<h3>(No se reciben datos del sensor de nivel del cisterna y del tanque)</h3>");
   }else if(status == 4){
-    browser.print("<h3>(No se reciben datos del sensor de nivel de la cisterna)</h3>");
-  }else if(status == 5){
     browser.print("<h3>(No se reciben datos del sensor de nivel de la tanque)</h3>");
+  }else if(status == 5){
+    browser.print("<h3>(No se reciben datos del sensor de nivel de la cisterna)</h3>");
   }
   browser.println("</body></html>");
   delay(1);
