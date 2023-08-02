@@ -38,7 +38,7 @@ float muestraPorcentaje1=0;
 float muestraPromedio1=0;
 float muestraPorcentaje2=0;
 float muestraPromedio2=0;
-int capacidadDelTanque1 = 280;
+int capacidadDelTanque1 = 300;
 int capacidadDelTanque2 = 400;
 stringstream ss;
 string str;
@@ -127,8 +127,6 @@ void clientRequest8080(){
       String solicitud = clientS.readStringUntil('\r');
       if(solicitud.indexOf("Slave1") == 0){
         //Manejo de la solicitud del Slave0
-        //Actualizar el tiempo de la última comunicación con el Slave
-        lastSlaveCommunicationTime2 = millis();
         //Imprimir datos de la solicitud
         Serial.print("From "); Serial.print(solicitud);
         int index = solicitud.indexOf(":");
@@ -137,23 +135,27 @@ void clientRequest8080(){
         Serial.print("Estado recibido: "); Serial.print(slaveState);
         //Obtencion de la medida del sensor
         medida1 = slaveState.toInt();
-        //Porcentaje de llenado del tanque
-        porcentaje1 = 100 - (((medida1)*100)/capacidadDelTanque1);
-        muestraPorcentaje1 = muestraPorcentaje1 + porcentaje1;
-        numeroMuestra1++;
-        Serial.print("\nPorcentaje de llenado = ");Serial.print(porcentaje1); Serial.print("%"); Serial.print(" Numero de Muestra = ");Serial.print(numeroMuestra1);
-        //Evaluacion del nevel de agua de la 
-        if(numeroMuestra1 == 40){
-          muestraPromedio1 = (muestraPorcentaje1/40);
-          if (muestraPromedio1 >= 20) {
-            estatusCisterna = true; // enciende la bomba
-            Serial.println("Hay agua en la cisterna");
-          } else {
-            estatusCisterna = false;  // apaga la bomba
-            Serial.println("No hay agua en la cisterna");
+        if (medida1 != 0){
+          //Actualizar el tiempo de la última comunicación con el Slave
+          lastSlaveCommunicationTime2 = millis();
+          //Porcentaje de llenado del tanque
+          porcentaje1 = 100 - (((medida1)*100)/capacidadDelTanque1);
+          muestraPorcentaje1 = muestraPorcentaje1 + porcentaje1;
+          numeroMuestra1++;
+          Serial.print("\nPorcentaje de llenado = ");Serial.print(porcentaje1); Serial.print("%"); Serial.print(" Numero de Muestra = ");Serial.print(numeroMuestra1);
+          //Evaluacion del nevel de agua de la 
+          if(numeroMuestra1 == 40){
+            muestraPromedio1 = (muestraPorcentaje1/40);
+            if (muestraPromedio1 >= 25) {
+              estatusCisterna = true; // enciende la bomba
+              Serial.println("Hay agua en la cisterna");
+            } else if(muestraPromedio1 <= 15){
+              estatusCisterna = false;  // apaga la bomba
+              Serial.println("No hay agua en la cisterna");
+            }
+            numeroMuestra1 = 0;
+            muestraPorcentaje1 = 0;
           }
-          numeroMuestra1 = 0;
-          muestraPorcentaje1 = 0;
         }
         clientS.print(nom);
         if (sendCmd) {
@@ -179,8 +181,6 @@ void clientRequest80(){
       String solicitud = clientP.readStringUntil('\r');
       if(solicitud.indexOf("Slave0") == 0){
         //Manejo de la solicitud del Slave0
-        //Actualizar el tiempo de la última comunicación con el Slave
-        lastSlaveCommunicationTime1 = millis();
         //Imprimir datos de la solicitud
         Serial.print("From "); Serial.print(solicitud);
         int index = solicitud.indexOf(":");
@@ -189,28 +189,32 @@ void clientRequest80(){
         Serial.print("Estado recibido: "); Serial.print(slaveState);
         //Obtencion de la medida del sensor
         medida2 = slaveState.toInt();
-        //Porcentaje de llenado del tanque
-        porcentaje2 = 100 - (((medida2)*100)/capacidadDelTanque2);
-        muestraPorcentaje2 = muestraPorcentaje2 + porcentaje2;
-        numeroMuestra2++;
-        Serial.print("\nPorcentaje de llenado = ");Serial.print(porcentaje2); Serial.print("%"); Serial.print(" Numero de Muestra = ");Serial.print(numeroMuestra2);
-        //Encendido y apagado de la bomba
-        if(numeroMuestra2 == 40){
-          muestraPromedio2 = (muestraPorcentaje2/40);
-          if (muestraPromedio2 >= 90) {
-              digitalWrite(BOMBA, HIGH); // apaga la bomba
-              Serial.println("Bomba apagada");
-          }else if (muestraPromedio2 < 50){
-              if(estatusCisterna){
-                digitalWrite(BOMBA, LOW);  // enciende la bomba
-                Serial.println("Bomba encendida");
-              }else{
-                Serial.println("No hay agua en la cisterna, no se encendera la bomba");
+        if(medida2 != 0){
+          //Actualizar el tiempo de la última comunicación con el Slave
+          lastSlaveCommunicationTime1 = millis();
+          //Porcentaje de llenado del tanque
+          porcentaje2 = 100 - (((medida2)*100)/capacidadDelTanque2);
+          muestraPorcentaje2 = muestraPorcentaje2 + porcentaje2;
+          numeroMuestra2++;
+          Serial.print("\nPorcentaje de llenado = ");Serial.print(porcentaje2); Serial.print("%"); Serial.print(" Numero de Muestra = ");Serial.print(numeroMuestra2);
+          //Encendido y apagado de la bomba
+          if(numeroMuestra2 == 40){
+            muestraPromedio2 = (muestraPorcentaje2/40);
+            if (muestraPromedio2 >= 90) {
                 digitalWrite(BOMBA, HIGH); // apaga la bomba
-              }
+                Serial.println("Bomba apagada");
+            }else if (muestraPromedio2 < 75){
+                if(estatusCisterna){
+                  digitalWrite(BOMBA, LOW);  // enciende la bomba
+                  Serial.println("Bomba encendida");
+                }else{
+                  Serial.println("No hay agua en la cisterna, no se encendera la bomba");
+                  digitalWrite(BOMBA, HIGH); // apaga la bomba
+                }
+            }
+            numeroMuestra2 = 0;
+            muestraPorcentaje2 = 0;   
           }
-          numeroMuestra2 = 0;
-          muestraPorcentaje2 = 0;   
         }
         clientP.print(nom);
         if (sendCmd) {
