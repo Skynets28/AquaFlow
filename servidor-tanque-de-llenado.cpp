@@ -38,7 +38,7 @@ float muestraPorcentaje1=0;
 float muestraPromedio1=0;
 float muestraPorcentaje2=0;
 float muestraPromedio2=0;
-int capacidadDelTanque1 = 300;
+int capacidadDelTanque1 = 240; //ANTES 300 cm
 int capacidadDelTanque2 = 400;
 stringstream ss;
 string str;
@@ -47,7 +47,7 @@ bool estado = 0;
 bool estadoAnt = 0;
 bool responseSlave0 = true;
 bool responseSlave1 = false;
-bool estatusCisterna = false;
+bool estatusCisterna = true;
 
 //Variables para el timer
 unsigned long previousMillis = 0;  // Variable para almacenar el tiempo anterior
@@ -139,19 +139,22 @@ void clientRequest8080(){
           //Actualizar el tiempo de la última comunicación con el Slave
           lastSlaveCommunicationTime2 = millis();
           //Porcentaje de llenado del tanque
-          porcentaje1 = 100 - (((medida1)*100)/capacidadDelTanque1);
+          porcentaje1 =  100 - (((medida1)*100)/capacidadDelTanque1);
+          if (porcentaje1 < 0){
+            porcentaje1 = 0;
+          }
           muestraPorcentaje1 = muestraPorcentaje1 + porcentaje1;
           numeroMuestra1++;
           Serial.print("\nPorcentaje de llenado = ");Serial.print(porcentaje1); Serial.print("%"); Serial.print(" Numero de Muestra = ");Serial.print(numeroMuestra1);
           //Evaluacion del nevel de agua de la 
           if(numeroMuestra1 == 40){
             muestraPromedio1 = (muestraPorcentaje1/40);
-            if (muestraPromedio1 >= 25) {
+            if (muestraPromedio1 >= 15) {
               estatusCisterna = true; // enciende la bomba
               Serial.println("Hay agua en la cisterna");
-            } else if(muestraPromedio1 <= 15){
+            } else if(muestraPromedio1 <= 10){
               estatusCisterna = false;  // apaga la bomba
-              Serial.println("No hay agua en la cisterna");
+              Serial.println("Bajo nivel de agua en la cisterna");
             }
             numeroMuestra1 = 0;
             muestraPorcentaje1 = 0;
@@ -280,7 +283,7 @@ void webpage(WiFiClient browser, float muestraPromedio1, float muestraPromedio2,
     browser.print("<h3>ESTATUS DEL SISTEMA: ENCENDIDO</h3>");
   }
   if(status == 1){
-    browser.print("<h3>(Funcionando correctamente, No hay agua en la cisterna)</h3>");
+    browser.print("<h3>(Funcionando correctamente, Bajo nivel de agua en la cisterna)</h3>");
   }else if(status == 2){
     browser.print("<h3>(Funcionando correctamente)</h3>");
   }else if(status == 3){
